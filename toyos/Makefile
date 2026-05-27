@@ -17,7 +17,10 @@ LDFLAGS = -z max-page-size=4096
 OBJS = \
   $(K)/entry.o \
   $(K)/start.o \
-  $(K)/main.o
+  $(K)/main.o \
+  $(K)/sbi.o \
+  $(K)/console.o \
+  $(K)/printf.o
 
 $(K)/kernel: $(OBJS) $(K)/kernel.ld
 	$(LD) $(LDFLAGS) -T $(K)/kernel.ld -o $(K)/kernel $(OBJS)
