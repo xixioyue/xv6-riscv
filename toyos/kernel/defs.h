@@ -9,6 +9,10 @@ void start(void);
 void main(void);
 
 void *memmove(void *dst, const void *src, uint n);
+void *memset(void *dst, int c, uint n);
+void kinit(void);
+void *kalloc(void);
+void kfree(void *pa);
 void trap_init(void);
 void load_user_program(void);
 void enter_user_space(void);

@@ -9,6 +9,7 @@
 #define PHYSTOP (0x80000000L + 128 * 1024 * 1024)
 
 #define PGSIZE 4096
+#define PGROUNDUP(sz) (((sz) + PGSIZE - 1) & ~(PGSIZE - 1))
 #define TRAPFRAME_BASE (PHYSTOP - PGSIZE)
 
 #define SSTATUS_SPP (1L << 8)

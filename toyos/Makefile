@@ -24,6 +24,7 @@ OBJS = \
   $(K)/console.o \
   $(K)/printf.o \
   $(K)/string.o \
+  $(K)/kalloc.o \
   $(K)/syscall.o \
   $(K)/trap.o \
   $(K)/trampoline.o \

@@ -6,6 +6,12 @@ main(void)
   printf("Hello World, ToyOS is initializing.\n");
   printf("ToyOS printf works: %d %x %s\n", 123, 0xabc, "ok");
 
+  kinit();
+  void *page = kalloc();
+  printf("physical page allocator initialized, first page=%p\n", page);
+  if(page)
+    kfree(page);
+
   trap_init();
   load_user_program();
   printf("entering user space...\n");
