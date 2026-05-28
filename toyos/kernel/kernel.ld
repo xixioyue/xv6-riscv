@@ -14,6 +14,11 @@ SECTIONS
     *(.rodata .rodata.*)
   }
 
+    .initcode : {
+    . = ALIGN(16);
+    *(.initcode)
+  }
+  
   .data : {
     . = ALIGN(16);
     *(.data .data.*)

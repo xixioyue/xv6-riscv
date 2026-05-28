@@ -22,7 +22,8 @@ OBJS = \
   $(K)/main.o \
   $(K)/sbi.o \
   $(K)/console.o \
-  $(K)/printf.o
+  $(K)/printf.o \
+  $(U)/initcode.ld.o
 
 UOBJS = \
   $(U)/initcode.o \
@@ -54,6 +55,9 @@ $(U)/initcode: $(UOBJS) $(U)/user.ld
 
 $(U)/initcode.bin: $(U)/initcode
 	$(OBJCOPY) -S -O binary $(U)/initcode $(U)/initcode.bin
+
+$(U)/initcode.ld.o: $(U)/initcode.ld.S $(U)/initcode.bin
+	$(CC) $(CFLAGS) -c -o $@ $(U)/initcode.ld.S
 
 .PHONY: qemu clean
 
