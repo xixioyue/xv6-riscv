@@ -1,8 +1,10 @@
 K = kernel
+U = user
 
 TOOLPREFIX ?= riscv64-unknown-elf-
 CC = $(TOOLPREFIX)gcc
 LD = $(TOOLPREFIX)ld
+OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
 QEMU = qemu-system-riscv64
 
@@ -22,6 +24,11 @@ OBJS = \
   $(K)/console.o \
   $(K)/printf.o
 
+UOBJS = \
+  $(U)/initcode.o \
+  $(U)/user.o \
+  $(U)/usys.o
+
 $(K)/kernel: $(OBJS) $(K)/kernel.ld
 	$(LD) $(LDFLAGS) -T $(K)/kernel.ld -o $(K)/kernel $(OBJS)
 	$(OBJDUMP) -S $(K)/kernel > $(K)/kernel.asm
@@ -32,6 +39,22 @@ $(K)/%.o: $(K)/%.c
 $(K)/%.o: $(K)/%.S
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+$(U)/usys.S: $(U)/usys.pl
+	perl $(U)/usys.pl > $(U)/usys.S
+
+$(U)/%.o: $(U)/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(U)/%.o: $(U)/%.S
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(U)/initcode: $(UOBJS) $(U)/user.ld
+	$(LD) $(LDFLAGS) -T $(U)/user.ld -o $(U)/initcode $(UOBJS)
+	$(OBJDUMP) -S $(U)/initcode > $(U)/initcode.asm
+
+$(U)/initcode.bin: $(U)/initcode
+	$(OBJCOPY) -S -O binary $(U)/initcode $(U)/initcode.bin
+
 .PHONY: qemu clean
 
 qemu: $(K)/kernel
@@ -39,3 +62,4 @@ qemu: $(K)/kernel
 
 clean:
 	rm -f $(K)/*.o $(K)/*.asm $(K)/kernel
+	rm -f $(U)/*.o $(U)/*.asm $(U)/usys.S $(U)/initcode $(U)/initcode.bin
