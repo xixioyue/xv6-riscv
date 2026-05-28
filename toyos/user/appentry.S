@@ -1,10 +1,8 @@
 .text
 .global _start
 _start:
+  call main
   li a0, 0
-  call exec
-
-  li a0, 1
   call exit
 
 loop:

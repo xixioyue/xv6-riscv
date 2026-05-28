@@ -15,10 +15,12 @@ main(void)
   kvminit();
   kvminithart();
   printf("kernel paging enabled with direct map\n");
+  vmprint(kernel_pagetable);
 
+  procinit();
+  userinit();
   trap_init();
-  load_user_program();
-  printf("entering user space...\n");
+  printf("entering first process...\n");
   enter_user_space();
 
   for(;;)

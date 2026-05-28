@@ -15,3 +15,8 @@ sub entry {
 }
 
 entry("print");
+entry("fork");
+entry("exit");
+entry("wait");
+entry("exec");
+entry("getpid");

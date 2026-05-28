@@ -15,3 +15,11 @@ sbi_call(uint64 which, uint64 arg0, uint64 arg1, uint64 arg2)
 
   return a0;
 }
+
+void
+sbi_shutdown(void)
+{
+  sbi_call(8, 0, 0, 0);
+  for(;;)
+    ;
+}

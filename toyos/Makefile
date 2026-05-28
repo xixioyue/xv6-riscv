@@ -26,13 +26,23 @@ OBJS = \
   $(K)/string.o \
   $(K)/kalloc.o \
   $(K)/vm.o \
+  $(K)/proc.o \
+  $(K)/elf.o \
+  $(K)/apps.o \
   $(K)/syscall.o \
   $(K)/trap.o \
   $(K)/trampoline.o \
+  $(K)/apps.ld.o \
   $(U)/initcode.ld.o
 
 UOBJS = \
   $(U)/initcode.o \
+  $(U)/user.o \
+  $(U)/usys.o
+
+APPOBJS = \
+  $(U)/appentry.o \
+  $(U)/app.o \
   $(U)/user.o \
   $(U)/usys.o
 
@@ -45,6 +55,9 @@ $(K)/%.o: $(K)/%.c
 
 $(K)/%.o: $(K)/%.S
 	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(K)/apps.ld.o: $(K)/apps.ld.S $(U)/app
+	$(CC) $(CFLAGS) -c -o $@ $(K)/apps.ld.S
 
 $(U)/usys.S: $(U)/usys.pl
 	perl $(U)/usys.pl > $(U)/usys.S
@@ -59,6 +72,10 @@ $(U)/initcode: $(UOBJS) $(U)/user.ld
 	$(LD) $(LDFLAGS) -T $(U)/user.ld -o $(U)/initcode $(UOBJS)
 	$(OBJDUMP) -S $(U)/initcode > $(U)/initcode.asm
 
+$(U)/app: $(APPOBJS) $(U)/user.ld
+	$(LD) $(LDFLAGS) -T $(U)/user.ld -o $(U)/app $(APPOBJS)
+	$(OBJDUMP) -S $(U)/app > $(U)/app.asm
+
 $(U)/initcode.bin: $(U)/initcode
 	$(OBJCOPY) -S -O binary $(U)/initcode $(U)/initcode.bin
 
@@ -72,4 +89,4 @@ qemu: $(K)/kernel
 
 clean:
 	rm -f $(K)/*.o $(K)/*.asm $(K)/kernel
-	rm -f $(U)/*.o $(U)/*.asm $(U)/usys.S $(U)/initcode $(U)/initcode.bin
+	rm -f $(U)/*.o $(U)/*.asm $(U)/usys.S $(U)/initcode $(U)/initcode.bin $(U)/app
