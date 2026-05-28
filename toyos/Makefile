@@ -23,6 +23,10 @@ OBJS = \
   $(K)/sbi.o \
   $(K)/console.o \
   $(K)/printf.o \
+  $(K)/string.o \
+  $(K)/syscall.o \
+  $(K)/trap.o \
+  $(K)/trampoline.o \
   $(U)/initcode.ld.o
 
 UOBJS = \

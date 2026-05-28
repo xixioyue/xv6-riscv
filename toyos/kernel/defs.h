@@ -7,3 +7,10 @@ void printf(const char *fmt, ...);
 
 void start(void);
 void main(void);
+
+void *memmove(void *dst, const void *src, uint n);
+void trap_init(void);
+void load_user_program(void);
+void enter_user_space(void);
+void usertrap(void);
+void syscall(void);

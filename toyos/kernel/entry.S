@@ -28,3 +28,5 @@ spin:
 .align 16
 stack0:
   .space 4096
+.global kernel_stack_top
+kernel_stack_top:

@@ -3,6 +3,7 @@
 
 // Keep the first user program away from the kernel image.
 #define USER_BASE 0x80400000L
+#define USER_STACK (USER_BASE + 2 * PGSIZE)
 
 // ToyOS currently runs with 128 MiB of RAM.
 #define PHYSTOP (0x80000000L + 128 * 1024 * 1024)
