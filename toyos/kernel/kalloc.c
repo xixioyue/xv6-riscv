@@ -47,6 +47,9 @@ kinit(void)
 {
   char *p = (char *)PGROUNDUP((uint64)end);
 
-  for(; p < (char *)TRAPFRAME_BASE; p += PGSIZE)
+  for(; p < (char *)TRAPFRAME_BASE; p += PGSIZE) {
+    if((uint64)p >= USER_BASE && (uint64)p < USER_STACK)
+      continue;
     kfree(p);
+  }
 }
