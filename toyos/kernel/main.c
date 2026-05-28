@@ -12,6 +12,11 @@ main(void)
   if(page)
     kfree(page);
 
+  pagetable_t test_pagetable = (pagetable_t)kalloc();
+  memset(test_pagetable, 0, PGSIZE);
+  if(mappages(test_pagetable, 0x0, PGSIZE, USER_BASE, PTE_R | PTE_X | PTE_U) == 0)
+    printf("page table test: va 0x0 -> pa %p\n", USER_BASE);
+
   trap_init();
   load_user_program();
   printf("entering user space...\n");
