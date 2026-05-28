@@ -12,6 +12,10 @@ main(void)
   if(page)
     kfree(page);
 
+  kvminit();
+  kvminithart();
+  printf("kernel paging enabled with direct map\n");
+
   trap_init();
   load_user_program();
   printf("entering user space...\n");

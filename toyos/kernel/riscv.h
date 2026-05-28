@@ -1,6 +1,10 @@
 #include "kernel/types.h"
 #include "kernel/memlayout.h"
 
+#define SATP_SV39 (8L << 60)
+
+#define MAKE_SATP(pagetable) (SATP_SV39 | (((uint64)(pagetable)) >> 12))
+
 static inline uint64
 r_sstatus(void)
 {
@@ -41,6 +45,18 @@ static inline void
 w_stvec(uint64 x)
 {
   asm volatile("csrw stvec, %0" : : "r"(x));
+}
+
+static inline void
+w_satp(uint64 x)
+{
+  asm volatile("csrw satp, %0" : : "r"(x));
+}
+
+static inline void
+sfence_vma(void)
+{
+  asm volatile("sfence.vma zero, zero");
 }
 
 static inline void
