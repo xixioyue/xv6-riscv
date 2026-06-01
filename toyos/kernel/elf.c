@@ -2,19 +2,19 @@
 #include "kernel/elf.h"
 #include "kernel/memlayout.h"
 #include "kernel/vm.h"
+#include "kernel/types.h"
+#include "kernel/riscv.h"
 
 static int
 flags2perm(int flags)
 {
-  int perm = PTE_U;
+  int perm = PTE_R | PTE_U;
 
-  if(flags & ELF_PROG_FLAG_READ)
-    perm |= PTE_R;
-  if(flags & ELF_PROG_FLAG_WRITE)
-    perm |= PTE_W;
-  if(flags & ELF_PROG_FLAG_EXEC)
+  if(flags & 0x1)
     perm |= PTE_X;
-
+  if(flags & 0x2)
+    perm |= PTE_W;
+    
   return perm;
 }
 
@@ -26,7 +26,7 @@ loadseg_mem(pagetable_t pagetable, uint64 va, const char *buf, uint off, uint sz
   for(i = 0; i < sz; i += PGSIZE) {
     uint64 pa = walkaddr(pagetable, va + i);
     if(pa == 0) {
-      printf("elf: loadseg_mem missing page\n");
+      printf("elf: loadseg_mem: missing page");
       return -1;
     }
 
@@ -46,6 +46,7 @@ elf_load_from_mem(pagetable_t pagetable, const void *buf, uint64 bufsz,
   struct elfhdr elf;
   struct proghdr ph;
   uint64 off;
+  int i;
   uint64 sz = 0;
 
   if(bufsz < sizeof(elf))
@@ -55,8 +56,7 @@ elf_load_from_mem(pagetable_t pagetable, const void *buf, uint64 bufsz,
   if(elf.magic != ELF_MAGIC)
     return -1;
 
-  for(int i = 0, off_i = elf.phoff; i < elf.phnum; i++, off_i += sizeof(ph)) {
-    off = off_i;
+  for(i = 0, off = elf.phoff; i < elf.phnum; i++, off += sizeof(ph)) {
     if(off + sizeof(ph) > bufsz)
       return -1;
 
@@ -69,8 +69,6 @@ elf_load_from_mem(pagetable_t pagetable, const void *buf, uint64 bufsz,
     if(ph.vaddr + ph.memsz < ph.vaddr)
       return -1;
     if(ph.vaddr % PGSIZE != 0)
-      return -1;
-    if(ph.off + ph.filesz > bufsz)
       return -1;
 
     uint64 newsz = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz, flags2perm(ph.flags));

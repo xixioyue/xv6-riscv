@@ -2,12 +2,15 @@
 #include "kernel/memlayout.h"
 #include "kernel/riscv.h"
 #include "kernel/vm.h"
+#include "kernel/types.h"
 
 pagetable_t kernel_pagetable;
-pagetable_t user_pagetable;
 
 #define VMPRINT_MAX_LEAVES 32
 
+// 根据虚拟地址 va 查找最低一级页表项（PTE）
+// Sv39 共有三级页表：循环遍历 L2、L1，最终返回 L0 中的叶子位置
+// alloc 非零时，缺失的中间页表页会由 kalloc() 自动创建
 pte_t *
 walk(pagetable_t pagetable, uint64 va, int alloc)
 {
@@ -23,22 +26,19 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     if(*pte & PTE_V) {
       pagetable = (pagetable_t)PTE2PA(*pte);
     } else {
-      if(!alloc)
+      if(!alloc||(pagetable = (pagetable_t)kalloc()) == 0)
         return 0;
 
-      pagetable_t newpt = (pagetable_t)kalloc();
-      if(newpt == 0)
-        return 0;
-
-      memset(newpt, 0, PGSIZE);
-      *pte = PA2PTE(newpt) | PTE_V;
-      pagetable = newpt;
+      memset(pagetable, 0, PGSIZE);
+      *pte = PA2PTE(pagetable) | PTE_V;
     }
   }
 
   return &pagetable[PX(0, va)];
 }
 
+// 建立 [va, va + size) 到 [pa, pa + size) 的逐页映射
+// va 和 size 必须按页对齐；perm 描述可读、可写、可执行及用户访问权限
 int
 mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 {
@@ -52,10 +52,11 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   }
 
   if((size % PGSIZE) != 0 || size == 0) {
-    printf("mappages: bad size %d\n", size);
+    printf("mappages: size not aligned or zero %d\n", size);
     return -1;
   }
 
+  // 计算起始地址和结束地址
   a = va;
   last = va + size - PGSIZE;
 
@@ -115,45 +116,6 @@ kvminithart(void)
   w_satp(MAKE_SATP(kernel_pagetable));
   sfence_vma();
   w_sstatus(r_sstatus() | SSTATUS_SUM);
-}
-
-pagetable_t
-uvmmake(void)
-{
-  pagetable_t upgtbl = (pagetable_t)kalloc();
-  if(upgtbl == 0) {
-    printf("uvmmake: kalloc failed\n");
-    for(;;)
-      ;
-  }
-
-  memset(upgtbl, 0, PGSIZE);
-
-  if(mappages(upgtbl, KERNBASE, USER_BASE - KERNBASE, KERNBASE, PTE_R | PTE_W | PTE_X) != 0) {
-    printf("uvmmake: kernel map before user failed\n");
-    for(;;)
-      ;
-  }
-
-  if(mappages(upgtbl, USER_BASE, USER_STACK - USER_BASE, USER_BASE, PTE_R | PTE_W | PTE_X | PTE_U) != 0) {
-    printf("uvmmake: user map failed\n");
-    for(;;)
-      ;
-  }
-
-  if(mappages(upgtbl, USER_STACK, PHYSTOP - USER_STACK, USER_STACK, PTE_R | PTE_W | PTE_X) != 0) {
-    printf("uvmmake: kernel map after user failed\n");
-    for(;;)
-      ;
-  }
-
-  return upgtbl;
-}
-
-void
-uvminit(void)
-{
-  user_pagetable = uvmmake();
 }
 
 uint64

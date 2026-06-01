@@ -1,6 +1,7 @@
 OUTPUT_ARCH("riscv")
 ENTRY(_start)
 
+/* 用户程序链接脚本：所有用户 ELF 都约定从虚拟地址 0x1000 开始 */
 SECTIONS
 {
   . = 0x1000;

@@ -32,6 +32,7 @@ OBJS = \
   $(K)/syscall.o \
   $(K)/trap.o \
   $(K)/trampoline.o \
+  $(K)/swtch.o \
   $(K)/apps.ld.o \
   $(U)/initcode.ld.o
 

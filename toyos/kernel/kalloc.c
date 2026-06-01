@@ -1,5 +1,7 @@
 #include "kernel/defs.h"
 #include "kernel/memlayout.h"
+#include "kernel/riscv.h"
+#include "kernel/types.h"
 
 extern char end[];
 

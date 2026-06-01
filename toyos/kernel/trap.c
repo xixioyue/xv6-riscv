@@ -1,6 +1,9 @@
 #include "kernel/defs.h"
 #include "kernel/memlayout.h"
 #include "kernel/riscv.h"
+#include "kernel/syscall.h"
+#include "kernel/types.h"
+#include "kernel/proc.h"
 
 extern void uservec(void);
 extern void userret(void);
@@ -9,6 +12,33 @@ void
 trap_init(void)
 {
   w_stvec((uint64)uservec);
+}
+
+void
+usertrap(void)
+{
+  struct proc *p = current_proc();
+  struct trapframe *tf = p->trapframe;
+
+  if((r_sstatus() & SSTATUS_SPP) != 0) {
+    printf("usertrap：并非来自用户态\n");
+    for(;;)
+      ;
+  }
+
+  tf->epc = r_sepc();
+
+  if(r_scause() == 8) {
+    tf->epc += 4;
+    intr_on();
+    syscall();
+  } else {
+    printf("unexpected trap scause=%p sepc=%p\n", r_scause(), r_sepc());
+    for(;;)
+      ;
+  }
+
+  usertrapret();
 }
 
 void
@@ -31,32 +61,5 @@ usertrapret(void)
 void
 enter_user_space(void)
 {
-  usertrapret();
-}
-
-void
-usertrap(void)
-{
-  struct proc *p = current_proc();
-  struct trapframe *tf = p->trapframe;
-
-  if((r_sstatus() & SSTATUS_SPP) != 0) {
-    printf("panic: usertrap not from user mode\n");
-    for(;;)
-      ;
-  }
-
-  tf->epc = r_sepc();
-
-  if(r_scause() == 8) {
-    tf->epc += 4;
-    intr_on();
-    syscall();
-  } else {
-    printf("unexpected trap scause=%p sepc=%p\n", r_scause(), r_sepc());
-    for(;;)
-      ;
-  }
-
   usertrapret();
 }

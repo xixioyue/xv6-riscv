@@ -59,6 +59,14 @@ sfence_vma(void)
   asm volatile("sfence.vma zero, zero");
 }
 
+static inline uint64
+r_tp(void)
+{
+  uint64 x;
+  asm volatile("mv %0, tp" : "=r"(x));
+  return x;
+}
+
 static inline void
 intr_on(void)
 {

@@ -1,5 +1,8 @@
 #include "kernel/defs.h"
 #include "kernel/syscall.h"
+#include "kernel/types.h"
+#include "kernel/proc.h"
+#include "kernel/vm.h"
 
 static uint64
 argraw(int n)
@@ -73,6 +76,7 @@ sys_getpid(void)
   return current_proc()->pid;
 }
 
+// a7 保存系统调用号，a0 保存返回值。若系统调用改变了当前进程，
 void
 syscall(void)
 {

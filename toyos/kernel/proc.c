@@ -7,8 +7,9 @@
 struct proc proc[NPROC];
 static int nextpid = 1;
 static struct proc *curproc;
+static struct proc *initproc;
+static struct context scheduler_context;
 
-extern char kernel_stack_top[];
 extern char _binary_user_initcode_bin_start[];
 extern char _binary_user_initcode_bin_end[];
 
@@ -58,10 +59,19 @@ static void
 setup_trapframe(struct proc *p, uint64 epc, uint64 sp)
 {
   p->trapframe->kernel_satp = MAKE_SATP(kernel_pagetable);
-  p->trapframe->kernel_sp = (uint64)kernel_stack_top;
+  p->trapframe->kernel_sp = p->kstack + PGSIZE;
   p->trapframe->kernel_trap = (uint64)usertrap;
+  p->trapframe->kernel_hartid = r_tp();
   p->trapframe->epc = epc;
   p->trapframe->sp = sp;
+}
+
+static void
+setup_context(struct proc *p)
+{
+  memset(&p->context, 0, sizeof(p->context));
+  p->context.ra = (uint64)usertrapret;
+  p->context.sp = p->kstack + PGSIZE;
 }
 
 pagetable_t
@@ -85,6 +95,7 @@ procinit(void)
   memset(proc, 0, sizeof(proc));
   appsinit();
   curproc = 0;
+  initproc = 0;
   nextpid = 1;
 }
 
@@ -136,33 +147,12 @@ userinit(void)
 
   p->sz = sz;
   setup_trapframe(p, USER_ENTRY, USER_INIT_STACK);
+  setup_context(p);
   safestrcpy(p->name, "initcode", sizeof(p->name));
-  p->state = RUNNING;
-  curproc = p;
+  p->state = RUNNABLE;
+  initproc = p;
 
   printf("created init process pid=%d, initcode size=%d bytes\n", p->pid, init_size);
-}
-
-static struct proc *
-find_runnable_child(struct proc *parent)
-{
-  for(struct proc *p = proc; p < &proc[NPROC]; p++) {
-    if(p->parent == parent && p->state == RUNNABLE)
-      return p;
-  }
-
-  return 0;
-}
-
-static struct proc *
-find_runnable(void)
-{
-  for(struct proc *p = proc; p < &proc[NPROC]; p++) {
-    if(p->state == RUNNABLE)
-      return p;
-  }
-
-  return 0;
 }
 
 void
@@ -179,6 +169,7 @@ freeproc(struct proc *p)
   p->state = UNUSED;
 }
 
+// 父进程得到子进程 PID；子进程的 trapframe->a0 被设为 0，
 int
 fork_proc(void)
 {
@@ -202,6 +193,7 @@ fork_proc(void)
   memmove(child->trapframe, parent->trapframe, sizeof(*child->trapframe));
   child->trapframe->a0 = 0;
   setup_trapframe(child, child->trapframe->epc, child->trapframe->sp);
+  setup_context(child);
 
   child->parent = parent;
   safestrcpy(child->name, parent->name, sizeof(child->name));
@@ -260,38 +252,80 @@ bad:
   return -1;
 }
 
+void
+sched(void)
+{
+  struct proc *p = current_proc();
+  swtch(&p->context, &scheduler_context);
+}
+
+void
+scheduler(void)
+{
+  for(;;) {
+    intr_on();
+    int found = 0;
+
+    for(struct proc *p = proc; p < &proc[NPROC]; p++) {
+      if(p->state != RUNNABLE)
+        continue;
+
+      found = 1;
+      p->state = RUNNING;
+      curproc = p;
+      swtch(&scheduler_context, &p->context);
+      curproc = 0;
+    }
+
+    if(!found) {
+      printf("no runnable process, system halted\n");
+      sbi_shutdown();
+    }
+  }
+}
+
+void
+wakeup(void *chan)
+{
+  if(chan == 0)
+    return;
+
+  for(struct proc *p = proc; p < &proc[NPROC]; p++) {
+    if(p->state == SLEEPING && p->chan == chan)
+      p->state = RUNNABLE;
+  }
+}
+
 int
 wait_proc(uint64 addr)
 {
   struct proc *p = current_proc();
-  int havekids = 0;
 
-  for(struct proc *pp = proc; pp < &proc[NPROC]; pp++) {
-    if(pp->parent != p)
-      continue;
+  for(;;) {
+    int havekids = 0;
 
-    havekids = 1;
-    if(pp->state == ZOMBIE) {
-      int pid = pp->pid;
-      if(addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate, sizeof(pp->xstate)) < 0)
-        return -1;
-      freeproc(pp);
-      return pid;
+    for(struct proc *pp = proc; pp < &proc[NPROC]; pp++) {
+      if(pp->parent != p)
+        continue;
+
+      havekids = 1;
+      if(pp->state == ZOMBIE) {
+        int pid = pp->pid;
+        if(addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate, sizeof(pp->xstate)) < 0)
+          return -1;
+        freeproc(pp);
+        return pid;
+      }
     }
+
+    if(!havekids || p->killed)
+      return -1;
+
+    p->chan = p;
+    p->state = SLEEPING;
+    sched();
+    p->chan = 0;
   }
-
-  if(!havekids)
-    return -1;
-
-  struct proc *child = find_runnable_child(p);
-  if(child == 0)
-    return -1;
-
-  p->wait_addr = addr;
-  p->state = SLEEPING;
-  child->state = RUNNING;
-  curproc = child;
-  return 0;
 }
 
 void
@@ -300,30 +334,21 @@ exit_proc(int status)
   struct proc *p = current_proc();
 
   printf("exit: pid=%d status=%d\n", p->pid, status);
+
+  for(struct proc *pp = proc; pp < &proc[NPROC]; pp++) {
+    if(pp->parent == p) {
+      pp->parent = initproc;
+      wakeup(initproc);
+    }
+  }
+
+  wakeup(p->parent);
+
   p->xstate = status;
   p->state = ZOMBIE;
+  sched();
 
-  if(p->parent && p->parent->state == SLEEPING) {
-    struct proc *parent = p->parent;
-    if(parent->wait_addr != 0)
-      copyout(parent->pagetable, parent->wait_addr, (char *)&p->xstate, sizeof(p->xstate));
-
-    parent->trapframe->a0 = p->pid;
-    parent->wait_addr = 0;
-    parent->state = RUNNING;
-    freeproc(p);
-    curproc = parent;
-    return;
-  }
-
-  struct proc *next = find_runnable();
-  if(next) {
-    next->state = RUNNING;
-    curproc = next;
-    return;
-  }
-
-  printf("no runnable process, system halted\n");
+  printf("exit: zombie process returned from sched\n");
   for(;;)
     ;
 }
